@@ -1,0 +1,4 @@
+# No request needed, just ask for data
+---
+float32 avg_linear
+float32 avg_angular
