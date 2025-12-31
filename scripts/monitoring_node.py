@@ -3,8 +3,8 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
-from assignment2_rt.msg import ObstacleInfo
-from assignment2_rt.srv import SetThreshold
+from assignment2_rt.msg import ObstacleInfo  # Custom message for reporting
+from assignment2_rt.srv import SetThreshold  # Custom service for settings
 import math
 
 
@@ -12,29 +12,31 @@ class MonitoringNode(Node):
     def __init__(self):
         super().__init__('monitoring_node')
 
-        # 1. Variables
-        self.safety_threshold = 1.0  # Default threshold in meters
-        self.width = 0  # To store the width of the laser scan array
+        # --- KEY VARIABLES ---
+        # 1. Safety Threshold: Distance (meters) below which safety override triggers
+        self.safety_threshold = 1.0  
+        self.width = 0 
 
-        # 2. Subscribers
-        # Listen to the laser scanner to detect obstacles
+        # --- SUBSCRIBERS ---
+        # Listen to the Laser Scanner to get distance data
+        # Topic: '/scan', Message: LaserScan
         self.create_subscription(LaserScan, '/scan', self.scan_callback, 10)
 
-        # 3. Publishers
-        # To publish safety commands (override user input)
+        # --- PUBLISHERS ---
+        # 1. Command Publisher: To stop/move robot when unsafe (overrides Controller Node)
         self.pub_cmd = self.create_publisher(Twist, '/cmd_vel', 10)
-        # To publish the custom status message
+        # 2. Info Publisher: Publishes the custom message required by the assignment
         self.pub_info = self.create_publisher(ObstacleInfo, '/obstacle_info', 10)
 
-        # 4. Service
-        # Allow changing the threshold dynamically
+        # --- SERVICES ---
+        # Allows dynamic changing of the safety threshold
         self.create_service(SetThreshold, 'set_safety_threshold', self.set_threshold_callback)
 
         self.get_logger().info("Monitoring Node Started. Threshold: 1.0m")
 
     def set_threshold_callback(self, request, response):
         """
-        Service to update the safety threshold.
+        Service Callback: Updates the safety distance threshold.
         """
         self.safety_threshold = request.new_threshold
         response.success = True
@@ -43,9 +45,10 @@ class MonitoringNode(Node):
 
     def get_sector_name(self, index, total_len):
         """
-        Helper function: Divides the laser array into 3 sectors to determine direction.
+        Helper Function: Determines the direction of the obstacle based on the index
+        of the laser ray in the array.
+        Logic: Splits the field of view into 3 sectors (Right, Front, Left).
         """
-        # We split the 180 (or 360) degree view into 3 chunks: Right, Front, Left
         one_third = total_len / 3
 
         if index < one_third:
@@ -57,42 +60,50 @@ class MonitoringNode(Node):
 
     def scan_callback(self, msg):
         """
-        Main logic loop: Runs every time the laser sends data.
+        Main Logic Loop: Runs every time the robot receives laser data.
         """
-        # Process Laser Data
-        # Filter out invalid values (inf) which mean "too far to see"
+        # DATA FILTERING ---
+        # Filter out 'inf' (infinity) and 'nan' (not a number) values.
+        # These usually mean the laser didn't hit anything within range.
         valid_ranges = [r for r in msg.ranges if not math.isinf(r) and not math.isnan(r)]
 
+        # If no valid data is found, assume we are safe or blind, and return.
         if not valid_ranges:
-            return  # No valid data, do nothing
+            return 
 
-        # Find the closest obstacle
+        # FIND CLOSEST OBSTACLE ---
+        # Get the minimum distance value from the filtered list
         min_distance = min(valid_ranges)
 
-        # Find the index of that minimum distance in the original array
+        # Find which index (ray) this minimum distance corresponds to
+        # This is needed to calculate the 'direction'
         try:
             min_index = msg.ranges.index(min_distance)
             direction = self.get_sector_name(min_index, len(msg.ranges))
         except ValueError:
             direction = "Unknown"
 
-        # Publish Custom Message (Requirement)
+        # PUBLISH STATUS (Assignment Requirement) ---
+        # Create and populate the custom message
         info_msg = ObstacleInfo()
         info_msg.distance = float(min_distance)
         info_msg.direction = direction
         info_msg.threshold = float(self.safety_threshold)
         self.pub_info.publish(info_msg)
 
-        # Check Safety (Requirement)
+        # SAFETY CHECK (Assignment Requirement) ---
+        # If the closest object is closer than our threshold...
         if min_distance < self.safety_threshold:
             self.get_logger().warn(f"OBSTACLE DETECTED in {direction}! Moving Back...")
 
             # Create a Twist message to move BACKWARDS
             stop_msg = Twist()
-            stop_msg.linear.x = -0.5  # Move back
+            stop_msg.linear.x = -0.5  # Negative X moves the robot backward
             stop_msg.angular.z = 0.0
 
-            # Publish it to /cmd_vel (This overrides the Controller Node's commands)
+            # Publish this command to /cmd_vel.
+            # Since this node runs alongside the controller, this message will
+            # physically interrupt/override the user's forward command.
             self.pub_cmd.publish(stop_msg)
 
 
@@ -101,10 +112,12 @@ def main(args=None):
     node = MonitoringNode()
 
     try:
+        # Spin keeps the node active, processing callbacks (scan, service)
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
+        # Cleanup
         node.destroy_node()
         rclpy.shutdown()
 
