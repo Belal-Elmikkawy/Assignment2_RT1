@@ -13,9 +13,10 @@ class MonitoringNode(Node):
         super().__init__('monitoring_node')
 
         # --- KEY VARIABLES ---
-        # 1. Safety Threshold: Distance (meters) below which safety override triggers
-        self.safety_threshold = 1.0  
-        self.width = 0 
+        # Safety Threshold: Distance (meters) below which safety override triggers
+        self.safety_threshold = 1.0
+        self.width = 0
+        self.reversing = False
 
         # --- SUBSCRIBERS ---
         # Listen to the Laser Scanner to get distance data
@@ -23,9 +24,9 @@ class MonitoringNode(Node):
         self.create_subscription(LaserScan, '/scan', self.scan_callback, 10)
 
         # --- PUBLISHERS ---
-        # 1. Command Publisher: To stop/move robot when unsafe (overrides Controller Node)
+        # Command Publisher: To stop/move robot when unsafe (overrides Controller Node)
         self.pub_cmd = self.create_publisher(Twist, '/cmd_vel', 10)
-        # 2. Info Publisher: Publishes the custom message required by the assignment
+        # Info Publisher: Publishes the custom message required by the assignment
         self.pub_info = self.create_publisher(ObstacleInfo, '/obstacle_info', 10)
 
         # --- SERVICES ---
@@ -69,7 +70,7 @@ class MonitoringNode(Node):
 
         # If no valid data is found, assume we are safe or blind, and return.
         if not valid_ranges:
-            return 
+            return
 
         # FIND CLOSEST OBSTACLE ---
         # Get the minimum distance value from the filtered list
@@ -95,6 +96,7 @@ class MonitoringNode(Node):
         # If the closest object is closer than our threshold...
         if min_distance < self.safety_threshold:
             self.get_logger().warn(f"OBSTACLE DETECTED in {direction}! Moving Back...")
+            self.reversing = True  # Set flag that we are in reversing state
 
             # Create a Twist message to move BACKWARDS
             stop_msg = Twist()
@@ -102,9 +104,18 @@ class MonitoringNode(Node):
             stop_msg.angular.z = 0.0
 
             # Publish this command to /cmd_vel.
-            # Since this node runs alongside the controller, this message will
-            # physically interrupt/override the user's forward command.
             self.pub_cmd.publish(stop_msg)
+
+        elif self.reversing:
+            # We are now SAFE (min_distance >= threshold), but we were reversing.
+            # We need to stop the robot so it doesn't keep going backwards forever.
+            self.get_logger().info("Safe distance restored. Stopping robot.")
+            stop_msg = Twist()
+            stop_msg.linear.x = 0.0
+            stop_msg.angular.z = 0.0
+            self.pub_cmd.publish(stop_msg)
+
+            self.reversing = False  # Reset flag
 
 
 def main(args=None):
