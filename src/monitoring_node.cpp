@@ -16,7 +16,7 @@ public:
         // 1. Subscribers & Publishers
         sub_scan_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
             "/scan", 10, std::bind(&MonitoringNode::scan_callback, this, std::placeholders::_1));
-        
+
         pub_cmd_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
         pub_info_ = this->create_publisher<assignment2_rt::msg::ObstacleInfo>("/obstacle_info", 10);
 
@@ -86,7 +86,7 @@ private:
         }
         else if (reversing_) {
             // Obstacle cleared, stop backing up
-            RCLCPP_INFO(this->get_logger(), "Safe distance restored. Stopping robot.");
+            RCLCPP_INFO(this->get_logger(), "Safe Zone Detected. Stopping robot.");
             reversing_ = false;
             twist_msg.linear.x = 0.0;
             twist_msg.angular.z = 0.0;

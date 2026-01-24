@@ -22,6 +22,20 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES geometry_msgs std_msgs
 )
 
+# 2.1 Build C++ Nodes
+add_executable(controller_node_cpp src/controller_node.cpp)
+ament_target_dependencies(controller_node_cpp rclcpp geometry_msgs sensor_msgs assignment2_rt)
+
+add_executable(monitoring_node_cpp src/monitoring_node.cpp)
+ament_target_dependencies(monitoring_node_cpp rclcpp geometry_msgs sensor_msgs assignment2_rt)
+
+# Install C++ Executables
+install(TARGETS
+  controller_node_cpp
+  monitoring_node_cpp
+  DESTINATION lib/${PROJECT_NAME}
+
+
 # 3. Install the Python Nodes
 # This copies your scripts to lib/assignment2_rt/ so "ros2 run" works
 install(PROGRAMS
