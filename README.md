@@ -67,11 +67,16 @@ graph TD
 
 ## 🛠️ Installation & Build
 
-1.  **Clone the repository** into your ROS 2 workspace `src` folder.
-2.  **Build the package** using `colcon`:
+1.  **Clone the repositories** into your ROS 2 workspace `src` folder:
+    ```bash
+    cd ~/ros2_ws/src
+    git clone https://github.com/CarmineD8/bme_gazebo_sensors.git
+    # Clone this package as well if not already present
+    ```
+2.  **Build the packages** using `colcon`:
     ```bash
     cd ~/ros2_ws
-    colcon build --packages-select assignment2_rt
+    colcon build
     ```
 3.  **Source the workspace**:
     ```bash
