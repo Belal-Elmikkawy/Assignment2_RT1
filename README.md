@@ -46,7 +46,7 @@ graph TD
     User -->|Keyboard Input| Controller
     Controller -->|/cmd_vel| Robot
     Robot -->|/scan| Monitor
-    Monitor -->|/cmd_vel (Safety Override)| Robot
+    Monitor -->|"/cmd_vel (Safety Override)"| Robot
     Monitor -->|/obstacle_info| External((External Tools))
 
     %% Service Connections

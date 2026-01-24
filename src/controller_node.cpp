@@ -2,6 +2,8 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "assignment2_rt/srv/get_velocity.hpp"
 
+#include "assignment2_rt/srv/set_threshold.hpp"
+
 #include <iostream>
 #include <vector>
 #include <numeric>
@@ -30,6 +32,9 @@ public:
             std::bind(&ControllerNode::get_avg_callback, this, std::placeholders::_1, std::placeholders::_2)
         );
 
+        // 3. Service Client
+        client_threshold_ = this->create_client<assignment2_rt::srv::SetThreshold>("set_safety_threshold");
+
         RCLCPP_INFO(this->get_logger(), "Controller Node (C++) Started. Ready for input.");
     }
 
@@ -41,6 +46,20 @@ public:
         publisher_->publish(msg);
 
         update_history(lin_x, ang_z);
+    }
+
+    void call_threshold_service(float new_thresh)
+    {
+        if (!client_threshold_->wait_for_service(std::chrono::seconds(1))) {
+            RCLCPP_WARN(this->get_logger(), "Service 'set_safety_threshold' not available.");
+            return;
+        }
+
+        auto request = std::make_shared<assignment2_rt::srv::SetThreshold::Request>();
+        request->new_threshold = new_thresh;
+
+        // Call asynchronously and ignore result for now (simplification)
+        client_threshold_->async_send_request(request);
     }
 
 private:
@@ -83,6 +102,7 @@ private:
 
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_;
     rclcpp::Service<assignment2_rt::srv::GetVelocity>::SharedPtr service_;
+    rclcpp::Client<assignment2_rt::srv::SetThreshold>::SharedPtr client_threshold_;
     std::deque<VelCommand> vel_history_;
     std::mutex history_mutex_;
 };
@@ -90,23 +110,33 @@ private:
 // --- INPUT LOOP FUNCTION ---
 void user_input_loop(std::shared_ptr<ControllerNode> node)
 {
-    float l_vel, a_vel;
+    float l_vel, a_vel, thresh;
     while (rclcpp::ok()) {
         std::cout << "\n---------------------------------" << std::endl;
         std::cout << "--- Robot Controller Interface (C++) ---" << std::endl;
+
         std::cout << "Enter Linear Velocity (x): ";
         if (!(std::cin >> l_vel)) {
             std::cin.clear(); std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
             continue; // Handle bad input
         }
+
         std::cout << "Enter Angular Velocity (z): ";
         if (!(std::cin >> a_vel)) {
             std::cin.clear(); std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
             continue;
         }
 
+        std::cout << "Enter Safety Threshold (m): ";
+        if (!(std::cin >> thresh)) {
+            std::cin.clear(); std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            continue;
+        }
+
         node->publish_velocity(l_vel, a_vel);
-        std::cout << "Sent: Linear=" << l_vel << ", Angular=" << a_vel << std::endl;
+        node->call_threshold_service(thresh);
+
+        std::cout << "Sent: Linear=" << l_vel << ", Angular=" << a_vel << ", Threshold=" << thresh << std::endl;
     }
 }
 

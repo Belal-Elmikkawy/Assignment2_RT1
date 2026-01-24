@@ -2,7 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from assignment2_rt.srv import GetVelocity  # Import our custom service definition
+from assignment2_rt.srv import GetVelocity, SetThreshold  # Import custom services
 import threading
 import sys
 
@@ -21,6 +21,9 @@ class ControllerNode(Node):
         # Service Name: 'get_avg_velocity', Type: GetVelocity
         self.srv = self.create_service(GetVelocity, 'get_avg_velocity', self.get_avg_callback)
 
+        # Service Client: To update the safety threshold on the monitoring node
+        self.cli_threshold = self.create_client(SetThreshold, 'set_safety_threshold')
+
         # History List: Stores the last 5 velocity commands
         # Format: [(lin1, ang1), (lin2, ang2), ...]
         self.vel_history = []
@@ -38,12 +41,25 @@ class ControllerNode(Node):
         msg = Twist()
         msg.linear.x = float(lin_x)
         msg.angular.z = float(ang_z)
-        
+
         # Publish the message to /cmd_vel topic
         self.publisher_.publish(msg)
 
         # Save this command to our history list for the service
         self.update_history(lin_x, ang_z)
+
+    def set_new_threshold(self, threshold):
+        """
+        Calls the SetThreshold service on the monitoring node.
+        """
+        if not self.cli_threshold.wait_for_service(timeout_sec=1.0):
+            print("WARNING: 'set_safety_threshold' service not available. Threshold not updated.")
+            return
+
+        req = SetThreshold.Request()
+        req.new_threshold = float(threshold)
+        future = self.cli_threshold.call_async(req)
+        # We don't block here to keep things simple, but in a real app check the result.
 
     def update_history(self, lin, ang):
         """
@@ -86,7 +102,7 @@ class ControllerNode(Node):
         # Log the result for debugging
         self.get_logger().info(
             f"Service called. Calculated Avg Lin: {response.avg_linear:.2f}, Avg Ang: {response.avg_angular:.2f}")
-        
+
         # Return the filled response object to the client
         return response
 
@@ -110,15 +126,21 @@ def main(args=None):
             print("--- Robot Controller Interface ---")
             l_vel = input("Enter Linear Velocity (x): ")
             a_vel = input("Enter Angular Velocity (z): ")
+            thresh = input("Enter Safety Threshold (m): ")
 
             try:
                 # Convert string input to float
                 l_vel = float(l_vel)
                 a_vel = float(a_vel)
+                thresh = float(thresh)
 
                 # Send command to robot
                 node.publish_velocity(l_vel, a_vel)
-                print(f"Sent: Linear={l_vel}, Angular={a_vel}")
+
+                # Update Threshold
+                node.set_new_threshold(thresh)
+
+                print(f"Sent: Linear={l_vel}, Angular={a_vel}, Threshold={thresh}")
 
             except ValueError:
                 # Handle cases where user types text instead of numbers
