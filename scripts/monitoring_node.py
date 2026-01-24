@@ -84,7 +84,7 @@ class MonitoringNode(Node):
         except ValueError:
             direction = "Unknown"
 
-        # PUBLISH STATUS (Assignment Requirement) ---
+        # PUBLISH STATUS ---
         # Create and populate the custom message
         info_msg = ObstacleInfo()
         info_msg.distance = float(min_distance)
@@ -92,7 +92,7 @@ class MonitoringNode(Node):
         info_msg.threshold = float(self.safety_threshold)
         self.pub_info.publish(info_msg)
 
-        # SAFETY CHECK (Assignment Requirement) ---
+        # SAFETY CHECK ---
         # If the closest object is closer than our threshold...
         if min_distance < self.safety_threshold:
             self.get_logger().warn(f"OBSTACLE DETECTED in {direction}! Moving Back...")
