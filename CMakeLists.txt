@@ -7,7 +7,7 @@ endif()
 
 # 1. Find all dependencies
 find_package(ament_cmake REQUIRED)
-find_package(rclpy REQUIRED)
+find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -23,11 +23,14 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 )
 
 # 2.1 Build C++ Nodes
+# 2.1 Build C++ Nodes
 add_executable(controller_node_cpp src/controller_node.cpp)
-ament_target_dependencies(controller_node_cpp rclcpp geometry_msgs sensor_msgs assignment2_rt)
+ament_target_dependencies(controller_node_cpp rclcpp geometry_msgs sensor_msgs)
+rosidl_target_interfaces(controller_node_cpp ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_executable(monitoring_node_cpp src/monitoring_node.cpp)
-ament_target_dependencies(monitoring_node_cpp rclcpp geometry_msgs sensor_msgs assignment2_rt)
+ament_target_dependencies(monitoring_node_cpp rclcpp geometry_msgs sensor_msgs)
+rosidl_target_interfaces(monitoring_node_cpp ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 # Install C++ Executables
 install(TARGETS
