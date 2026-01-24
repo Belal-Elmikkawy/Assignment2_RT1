@@ -33,7 +33,7 @@ ament_target_dependencies(monitoring_node_cpp rclcpp geometry_msgs sensor_msgs a
 install(TARGETS
   controller_node_cpp
   monitoring_node_cpp
-  DESTINATION lib/${PROJECT_NAME}
+  DESTINATION lib/${PROJECT_NAME})
 
 
 # 3. Install the Python Nodes
@@ -41,8 +41,8 @@ install(TARGETS
 install(PROGRAMS
   scripts/controller_node.py
   scripts/monitoring_node.py
-  DESTINATION lib/${PROJECT_NAME}
-)
+  DESTINATION lib/${PROJECT_NAME})
+
 
 # 4. Install Launch Files
 install(DIRECTORY
