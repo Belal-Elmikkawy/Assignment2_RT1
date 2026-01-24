@@ -1,4 +1,4 @@
-# Assignment 2 - Real-Time Robot Control (ROS 2)
+# Assignment 2 - Real-Time Robot Control (ROS 2), with 3D simulation using Gazebo
 
 A ROS 2 package for controlling a robot in a simulation environment, featuring obstacle avoidance, velocity monitoring, and dual-language support (Python & C++).
 
@@ -54,7 +54,6 @@ graph TD
     ServiceClient2[Service Client] -.->|/set_safety_threshold| Monitor
 
     %% Legend
-    linkStyle 1,3,4 stroke-width:2px,fill:none,stroke:#2980b9;
 ```
 
 ### 🤖 Node Details
