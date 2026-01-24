@@ -109,7 +109,7 @@ class MonitoringNode(Node):
         elif self.reversing:
             # We are now SAFE (min_distance >= threshold), but we were reversing.
             # We need to stop the robot so it doesn't keep going backwards forever.
-            self.get_logger().info("Safe distance restored. Stopping robot.")
+            self.get_logger().info("Safe Zone Detected. Stopping robot.")
             stop_msg = Twist()
             stop_msg.linear.x = 0.0
             stop_msg.angular.z = 0.0

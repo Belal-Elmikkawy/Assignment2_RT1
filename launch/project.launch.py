@@ -37,6 +37,7 @@ def generate_launch_description():
         package='assignment2_rt',
         executable='monitoring_node.py',
         name='monitor',
+        prefix='xterm -e',
         output='screen'
     )
 
