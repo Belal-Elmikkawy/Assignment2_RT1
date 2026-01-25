@@ -89,6 +89,26 @@ graph TD
 
 This package provides implementations in both **Python** and **C++**. Both versions function similarly and include a dedicated terminal for status messages.
 
+> **Note:** Ensure **Gazebo** is installed and functioning on your system. If you experience crashes or cannot run Gazebo locally, please use the **Docker** alternative below.
+
+### 🐳 Running with Docker (Alternative)
+
+If Gazebo fails to launch or crashes, you can use the following Docker image to run the environment via VNC:
+
+1.  **Start and Enable Docker**:
+    ```bash
+    sudo systemctl start docker
+    sudo systemctl enable docker
+    ```
+
+2.  **Run the Container**:
+    ```bash
+    sudo docker run -p 6080:80 --shm-size=512m tiryoh/ros2-desktop-vnc:jazzy-20251019T1559
+    ```
+
+3.  **Access the Interface**:
+    Open your web browser and go to: http://127.0.0.1:6080/
+
 ### Option 1: Running Python Nodes
 Launches the Python scripts from the `scripts/` directory.
 
