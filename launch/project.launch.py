@@ -8,11 +8,9 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    # Find the Simulation Package
+    # Launch the Simulation (from bme_gazebo_sensors)
     try:
         sim_pkg_share = FindPackageShare('bme_gazebo_sensors')
-
-        # Include launch file
         simulation = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 PathJoinSubstitution([sim_pkg_share, 'launch', 'spawn_robot.launch.py'])
@@ -20,21 +18,21 @@ def generate_launch_description():
         )
         has_sim = True
     except Exception:
-        print("WARNING: 'bme_gazebo_sensors' not found. Launching only custom nodes.")
+        print("WARNING: 'bme_gazebo_sensors' not found. Ensure it is in your workspace.")
         has_sim = False
 
-    # Define Controller Node
+    # Launch Controller (from assignment2_rt)
     controller_node = Node(
-        package='assignment2_rt',
+        package='assignment2_rt',    # <--- YOUR PACKAGE
         executable='controller_node.py',
         name='controller',
         prefix='xterm -e',
         output='screen'
     )
 
-    # Define Monitoring Node
+    # Launch Monitor (from assignment2_rt)
     monitor_node = Node(
-        package='assignment2_rt',
+        package='assignment2_rt',    # <--- YOUR PACKAGE
         executable='monitoring_node.py',
         name='monitor',
         prefix='xterm -e',

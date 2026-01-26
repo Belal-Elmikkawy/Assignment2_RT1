@@ -11,10 +11,10 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(nav_msgs REQUIRED) # Added for Odometry
 find_package(rosidl_default_generators REQUIRED)
 
-# 2. Generate the Custom Messages and Services
-# Ensure these filenames match exactly what is in your msg/ and srv/ folders
+# 2. Generate Custom Messages and Services
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ObstacleInfo.msg"
   "srv/SetThreshold.srv"
@@ -23,29 +23,33 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 )
 
 # 2.1 Build C++ Nodes
-# 2.1 Build C++ Nodes
-add_executable(controller_node_cpp src/controller_node.cpp)
-ament_target_dependencies(controller_node_cpp rclcpp geometry_msgs sensor_msgs)
-rosidl_target_interfaces(controller_node_cpp ${PROJECT_NAME} "rosidl_typesupport_cpp")
+add_executable(controller_node src/controller_node.cpp)
+ament_target_dependencies(controller_node rclcpp geometry_msgs nav_msgs)
 
-add_executable(monitoring_node_cpp src/monitoring_node.cpp)
-ament_target_dependencies(monitoring_node_cpp rclcpp geometry_msgs sensor_msgs)
-rosidl_target_interfaces(monitoring_node_cpp ${PROJECT_NAME} "rosidl_typesupport_cpp")
+add_executable(monitoring_node src/monitoring_node.cpp)
+ament_target_dependencies(monitoring_node rclcpp sensor_msgs geometry_msgs)
 
-# Install C++ Executables
-install(TARGETS
-  controller_node_cpp
-  monitoring_node_cpp
-  DESTINATION lib/${PROJECT_NAME})
+# Link against the generated interface target
+rosidl_target_interfaces(controller_node
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
+rosidl_target_interfaces(monitoring_node
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-# 3. Install the Python Nodes
-# This copies your scripts to lib/assignment2_rt/ so "ros2 run" works
+# 3. Install Python Nodes
 install(PROGRAMS
   scripts/controller_node.py
   scripts/monitoring_node.py
-  DESTINATION lib/${PROJECT_NAME})
+  DESTINATION lib/${PROJECT_NAME}
+  DESTINATION lib/${PROJECT_NAME}
+)
 
+# 3.1 Install C++ Executables
+install(TARGETS
+  controller_node
+  monitoring_node
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 # 4. Install Launch Files
 install(DIRECTORY

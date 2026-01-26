@@ -2,155 +2,111 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from assignment2_rt.srv import GetVelocity, SetThreshold  # Import custom services
+from nav_msgs.msg import Odometry  # Required for reading position
+from assignment2_rt.srv import GetVelocity  # Import from YOUR package
 import threading
-import sys
 
 
 class ControllerNode(Node):
     def __init__(self):
-        # Initialize the node with the name 'controller_node'
         super().__init__('controller_node')
 
-        # --- KEY VARIABLES ---
-        # Publisher: Sends velocity commands to the simulation
-        # Topic: '/cmd_vel', Message Type: Twist, Queue Size: 10
-        self.publisher_ = self.create_publisher(Twist, '/cmd_vel', 10)
+        # Subscribe to /odom to track position
+        self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
 
-        # Service Server: Responds to requests for velocity statistics
-        # Service Name: 'get_avg_velocity', Type: GetVelocity
+        self.publisher_ = self.create_publisher(Twist, '/cmd_vel', 10)
         self.srv = self.create_service(GetVelocity, 'get_avg_velocity', self.get_avg_callback)
 
-        # Service Client: To update the safety threshold on the monitoring node
-        self.cli_threshold = self.create_client(SetThreshold, 'set_safety_threshold')
-
-        # History List: Stores the last 5 velocity commands
-        # Format: [(lin1, ang1), (lin2, ang2), ...]
+        self.current_twist = Twist()
         self.vel_history = []
+        self.robot_x = 0.0  # Track X position
 
-        self.get_logger().info("Controller Node Started. Ready for input.")
+        # --- LIMITS ---
+        self.LIMIT_X_MAX = 3.0
+        self.LIMIT_X_MIN = -3.0
 
-    def publish_velocity(self, lin_x, ang_z):
-        """
-        Function to send a drive command to the robot.
-        Args:
-            lin_x (float): Linear velocity (forward/backward)
-            ang_z (float): Angular velocity (turning)
-        """
-        # Create the message object
-        msg = Twist()
-        msg.linear.x = float(lin_x)
-        msg.angular.z = float(ang_z)
+        self.timer = self.create_timer(0.1, self.timer_callback)
+        self.get_logger().info(
+            f"Controller Started. Constraints: {
+                self.LIMIT_X_MIN} < X < {
+                self.LIMIT_X_MAX}")
 
-        # Publish the message to /cmd_vel topic
-        self.publisher_.publish(msg)
+    def odom_callback(self, msg):
+        """Updates the robot's current X position."""
+        self.robot_x = msg.pose.pose.position.x
 
-        # Save this command to our history list for the service
-        self.update_history(lin_x, ang_z)
+    def timer_callback(self):
+        """Checks limits and publishes velocity."""
+        safe_cmd = Twist()
+        safe_cmd.linear.x = self.current_twist.linear.x
+        safe_cmd.angular.z = self.current_twist.angular.z
 
-    def set_new_threshold(self, threshold):
-        """
-        Calls the SetThreshold service on the monitoring node.
-        """
-        if not self.cli_threshold.wait_for_service(timeout_sec=1.0):
-            print("WARNING: 'set_safety_threshold' service not available. Threshold not updated.")
-            return
+        # --- LIMIT LOGIC ---
+        # 1. If at MAX limit (3.0) AND trying to go forward -> STOP
+        if self.robot_x >= self.LIMIT_X_MAX and safe_cmd.linear.x > 0:
+            self.get_logger().warn(
+                f"LIMIT REACHED (X={
+                    self.robot_x:.2f})! Stopping forward.",
+                throttle_duration_sec=2)
+            safe_cmd.linear.x = 0.0
 
-        req = SetThreshold.Request()
-        req.new_threshold = float(threshold)
-        future = self.cli_threshold.call_async(req)
-        # We don't block here to keep things simple, but in a real app check the result.
+        # 2. If at MIN limit (-3.0) AND trying to go backward -> STOP
+        elif self.robot_x <= self.LIMIT_X_MIN and safe_cmd.linear.x < 0:
+            self.get_logger().warn(
+                f"LIMIT REACHED (X={
+                    self.robot_x:.2f})! Stopping backward.",
+                throttle_duration_sec=2)
+            safe_cmd.linear.x = 0.0
 
-    def update_history(self, lin, ang):
-        """
-        Helper function to manage the size of the history list.
-        Implements a FIFO (First-In, First-Out) queue of size 5.
-        """
-        # Add new command tuple to the end of the list
-        self.vel_history.append((lin, ang))
+        self.publisher_.publish(safe_cmd)
 
-        # If list exceeds 5 items, remove the oldest item (index 0)
+    def set_velocity(self, lin_x, ang_z):
+        self.current_twist.linear.x = float(lin_x)
+        self.current_twist.angular.z = float(ang_z)
+
+        self.vel_history.append((lin_x, ang_z))
         if len(self.vel_history) > 5:
             self.vel_history.pop(0)
 
     def get_avg_callback(self, request, response):
-        """
-        Service Callback: Triggered when another node calls '/get_avg_velocity'.
-        Calculates the average of linear and angular velocities in history.
-        """
-        # Safety Check: If history is empty, return 0.0 to avoid division by zero error
         if not self.vel_history:
             response.avg_linear = 0.0
             response.avg_angular = 0.0
-            self.get_logger().warn("Request received, but history is empty.")
             return response
 
-        # Initialize sums
-        sum_lin = 0.0
-        sum_ang = 0.0
+        sum_lin = sum(v[0] for v in self.vel_history)
+        sum_ang = sum(v[1] for v in self.vel_history)
 
-        # Loop through stored history to calculate sums
-        for v in self.vel_history:
-            sum_lin += v[0]  # Add linear velocity
-            sum_ang += v[1]  # Add angular velocity
-
-        # Calculate Averages
-        count = len(self.vel_history)
-        response.avg_linear = sum_lin / count
-        response.avg_angular = sum_ang / count
-
-        # Log the result for debugging
-        self.get_logger().info(
-            f"Service called. Calculated Avg Lin: {response.avg_linear:.2f}, Avg Ang: {response.avg_angular:.2f}")
-
-        # Return the filled response object to the client
+        response.avg_linear = sum_lin / len(self.vel_history)
+        response.avg_angular = sum_ang / len(self.vel_history)
         return response
 
 
 def main(args=None):
-    # Initialize ROS 2 communication
     rclpy.init(args=args)
     node = ControllerNode()
-
-    # --- THREADING EXPLANATION ---
-    # The input() function is 'blocking', meaning code execution stops waiting for the user.
-    # ROS 2 needs to keep running (spinning) to listen for Service requests in the background.
-    # Therefore, we run rclpy.spin() in a separate thread.
     spin_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
     spin_thread.start()
 
     try:
-        # Main Control Loop: Keeps asking for user input until the node is shut down
         while rclpy.ok():
-            print("\n---------------------------------")
-            print("--- Robot Controller Interface ---")
-            l_vel = input("Enter Linear Velocity (x): ")
-            a_vel = input("Enter Angular Velocity (z): ")
-            thresh = input("Enter Safety Threshold (m): ")
-
+            print("\n" + "=" * 40)
+            print(f" CONTROLLER INTERFACE")
+            print(f" Status: X = {node.robot_x:.2f}")
+            print(f" Limits: [{node.LIMIT_X_MIN}, {node.LIMIT_X_MAX}]")
+            print("=" * 40)
+            l_input = input("Enter Linear Velocity (x): ")
+            a_input = input("Enter Angular Velocity (z): ")
             try:
-                # Convert string input to float
-                l_vel = float(l_vel)
-                a_vel = float(a_vel)
-                thresh = float(thresh)
-
-                # Send command to robot
-                node.publish_velocity(l_vel, a_vel)
-
-                # Update Threshold
-                node.set_new_threshold(thresh)
-
-                print(f"Sent: Linear={l_vel}, Angular={a_vel}, Threshold={thresh}")
-
+                l_vel = float(l_input)
+                a_vel = float(a_input)
+                node.set_velocity(l_vel, a_vel)
+                print(f"Target Set: v={l_vel}, w={a_vel}")
             except ValueError:
-                # Handle cases where user types text instead of numbers
-                print("Invalid input! Please enter numeric values.")
-
+                print("Invalid Input.")
     except KeyboardInterrupt:
-        # Handle Ctrl+C gracefully
         print("\nExiting...")
     finally:
-        # Clean up resources
         node.destroy_node()
         rclpy.shutdown()
 

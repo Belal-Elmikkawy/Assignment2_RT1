@@ -1,4 +1,4 @@
-# Assignment 2 - Real-Time Robot Control (ROS 2)
+# Assignment 2 - Real-Time Robot Control (ROS 2), with 3D simulation using Gazebo
 
 A ROS 2 package for controlling a robot in a simulation environment, featuring obstacle avoidance, velocity monitoring, and dual-language support (Python & C++).
 
@@ -54,7 +54,6 @@ graph TD
     ServiceClient2[Service Client] -.->|/set_safety_threshold| Monitor
 
     %% Legend
-    linkStyle 1,3,4 stroke-width:2px,fill:none,stroke:#2980b9;
 ```
 
 ### 🤖 Node Details
@@ -68,11 +67,16 @@ graph TD
 
 ## 🛠️ Installation & Build
 
-1.  **Clone the repository** into your ROS 2 workspace `src` folder.
-2.  **Build the package** using `colcon`:
+1.  **Clone the repositories** into your ROS 2 workspace `src` folder:
+    ```bash
+    cd ~/ros2_ws/src
+    git clone https://github.com/CarmineD8/bme_gazebo_sensors.git
+    # Clone this package as well if not already present
+    ```
+2.  **Build the packages** using `colcon`:
     ```bash
     cd ~/ros2_ws
-    colcon build --packages-select assignment2_rt
+    colcon build
     ```
 3.  **Source the workspace**:
     ```bash
@@ -85,6 +89,8 @@ graph TD
 
 This package provides implementations in both **Python** and **C++**. Both versions function similarly and include a dedicated terminal for status messages.
 
+> **Note:** These instructions assume a working local installation of **Gazebo**. If you experience crashes or cannot run Gazebo locally, please verify your installation or skip to the **[Running with Docker](#-running-with-docker-alternative)** section below.
+
 ### Option 1: Running Python Nodes
 Launches the Python scripts from the `scripts/` directory.
 
@@ -94,6 +100,7 @@ ros2 launch assignment2_rt project.launch.py
 
 -   **Interface**: A terminal window will open asking for Linear (x) and Angular (z) velocities.
 -   **Status Monitor**: A separate terminal will open displaying safety status ("OBSTACLE DETECTED" or "Safe Zone Detected").
+-   **Simulation**: The Gazebo environment will launch alongside the terminals.
 
 ### Option 2: Running C++ Nodes
 Launches the compiled C++ executables from the `src/` directory.
@@ -104,6 +111,47 @@ ros2 launch assignment2_rt project_cpp.launch.py
 
 -   **Interface**: Same behavior as Python, utilizing the optimized C++ binaries.
 -   **Status Monitor**: Opens the dedicated C++ monitoring terminal.
+-   **Simulation**: The Gazebo environment will launch alongside the terminals.
+
+### 🐳 Running with Docker (Alternative)
+
+If Gazebo fails to launch or crashes on your local machine, you can use the provided Docker image to run the environment via VNC.
+
+#### 1. Start Docker Container
+First, start and enable the Docker service, then run the container:
+
+```bash
+sudo systemctl start docker
+sudo systemctl enable docker
+sudo docker run -p 6080:80 --shm-size=512m tiryoh/ros2-desktop-vnc:jazzy-20251019T1559
+```
+
+#### 2. Access the VNC Interface
+Open your web browser and navigate to: http://127.0.0.1:6080/
+
+#### 3. Setup Project Inside Docker
+Once inside the VNC interface, open a terminal (System Tools -> LXTerminal) and set up the workspace:
+
+```bash
+# Create workspace directory
+mkdir -p ~/ros2_ws/src
+cd ~/ros2_ws/src
+
+# Clone the required repositories
+git clone https://github.com/CarmineD8/bme_gazebo_sensors.git
+# Clone this assignment repository here as well (replace with your actual repo URL)
+# git clone <repository_url> assignment2_rt
+
+# Build the workspace
+cd ~/ros2_ws
+colcon build
+
+# Source the workspace
+source install/setup.bash
+```
+
+#### 4. Run the Nodes
+Now you can proceed with **Option 1** or **Option 2** described above to launch the project within the Docker environment.
 
 ---
 
